@@ -48,11 +48,15 @@ Requires Go 1.18 or later:
 go install github.com/carmel/qrcp@latest
 ```
 
-### building from source
+### building or release from source
 
 ```sh
+# build
 go build -ldflags="-w -s" -trimpath -o qrcp .
 
+# release
+git tag v0.11.8
+git push origin v0.11.8
 goreleaser release --clean
 ```
 

@@ -52,6 +52,8 @@ go install github.com/carmel/qrcp@latest
 
 ```sh
 go build -ldflags="-w -s" -trimpath -o qrcp .
+
+goreleaser release --clean
 ```
 
 ### Prebuilt Binaries

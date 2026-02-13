@@ -191,38 +191,46 @@ func New(cfg *config.Config) (*Server, error) {
 	// Create handlers
 	// Send handler (sends file to caller)
 	http.HandleFunc("/s", func(w http.ResponseWriter, r *http.Request) {
-		if !cfg.KeepAlive && strings.HasPrefix(r.Header.Get("User-Agent"), "Mozilla") {
-			if cookie.Value == "" {
-				initCookie.Do(func() {
-					value, err := util.GetSessionID()
+		if !cfg.KeepAlive {
+			if strings.HasPrefix(r.Header.Get("User-Agent"), "Mozilla") {
+				if cookie.Value == "" {
+					initCookie.Do(func() {
+						value, err := util.GetSessionID()
+						if err != nil {
+							log.Println("Unable to generate session ID", err)
+							app.stopChannel <- true
+							return
+						}
+						cookie.Value = value
+						http.SetCookie(w, &cookie)
+					})
+				} else {
+					// Check for the expected cookie and value
+					// If it is missing or doesn't match
+					// return a 400 status
+					rcookie, err := r.Cookie(cookie.Name)
 					if err != nil {
-						log.Println("Unable to generate session ID", err)
-						app.stopChannel <- true
+						http.Error(w, err.Error(), http.StatusBadRequest)
 						return
 					}
-					cookie.Value = value
-					http.SetCookie(w, &cookie)
-				})
+					if rcookie.Value != cookie.Value {
+						http.Error(w, "mismatching cookie", http.StatusBadRequest)
+						return
+					}
+					// If the cookie exits and matches
+					// this is an aadditional request.
+					// Increment the waitgroup
+					waitgroup.Add(1)
+				}
+				// Remove connection from the waitgroup when done
+				defer waitgroup.Done()
 			} else {
-				// Check for the expected cookie and value
-				// If it is missing or doesn't match
-				// return a 400 status
-				rcookie, err := r.Cookie(cookie.Name)
-				if err != nil {
-					http.Error(w, err.Error(), http.StatusBadRequest)
-					return
-				}
-				if rcookie.Value != cookie.Value {
-					http.Error(w, "mismatching cookie", http.StatusBadRequest)
-					return
-				}
-				// If the cookie exits and matches
-				// this is an aadditional request.
-				// Increment the waitgroup
-				waitgroup.Add(1)
+				// Non-browser request (curl, wget, etc.)
+				// Shutdown immediately after serving the file
+				defer func() {
+					app.stopChannel <- true
+				}()
 			}
-			// Remove connection from the waitgroup when done
-			defer waitgroup.Done()
 		}
 		w.Header().Set("Content-Disposition", "attachment; filename=\""+
 			app.body.Filename+

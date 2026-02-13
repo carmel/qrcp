@@ -55,8 +55,8 @@ go install github.com/carmel/qrcp@latest
 go build -ldflags="-w -s" -trimpath -o qrcp .
 
 # release
-git tag v0.11.8
-git push origin v0.11.8
+git tag v0.11.9
+git push origin v0.11.9
 goreleaser release --clean
 ```
 
